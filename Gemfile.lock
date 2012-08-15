@@ -7,13 +7,6 @@ GIT
       rake
 
 GIT
-  remote: git://github.com/cloudfoundry/eventmachine.git
-  revision: 2806c630d8631d5dcf9fb2555f665b829052aabe
-  branch: release-0.12.11-cf
-  specs:
-    eventmachine (0.12.11.cloudfoundry.3)
-
-GIT
   remote: git://github.com/cloudfoundry/vcap-common.git
   revision: 1dca468ec017ea5d296aeac1aa2fb7a70affba63
   ref: 1dca468ec0
@@ -48,7 +41,7 @@ PATH
       datamapper (~> 1.1.0)
       do_sqlite3 (~> 0.10.3)
       em-http-request (~> 1.0.0.beta.3)
-      eventmachine (~> 0.12.11.cloudfoundry.3)
+      eventmachine (>= 1.0.0.beta.3)
       eventmachine_httpserver (~> 0.2.1)
       json (~> 1.4.6)
       nats (~> 0.4.22.beta.8)

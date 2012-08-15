@@ -16,7 +16,7 @@ Gem::Specification.new do |s|
   s.add_dependency "nats", "~> 0.4.22.beta.8"
   s.add_dependency "datamapper", "~> 1.1.0"
   s.add_dependency "do_sqlite3", "~> 0.10.3"
-  s.add_dependency "eventmachine", "~> 0.12.11.cloudfoundry.3"
+  s.add_dependency "eventmachine", ">= 1.0.0.beta.3"
   s.add_dependency "eventmachine_httpserver", "~> 0.2.1"
   s.add_dependency "json", "~> 1.4.6"
   s.add_dependency "uuidtools", "~> 2.1.2"
