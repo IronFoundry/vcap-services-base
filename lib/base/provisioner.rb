@@ -770,7 +770,7 @@ class VCAP::Services::Base::Provisioner < VCAP::Services::Base::Base
     raise ServiceError.new(ServiceError::NOT_FOUND, service_id) unless svc
 
     plan = find_service_plan(svc)
-    extensions_enabled?(plan, :snapshot)
+    extensions_enabled?(plan, :snapshot, &blk)
   rescue => e
     handle_error(e, &blk)
     nil # terminate evoke chain
@@ -792,7 +792,7 @@ class VCAP::Services::Base::Provisioner < VCAP::Services::Base::Base
     raise ServiceError.new(ServiceError::NOT_FOUND, service_id) unless svc
 
     plan = find_service_plan(svc)
-    extensions_enabled?(plan, :serialization)
+    extensions_enabled?(plan, :serialization, &blk)
   rescue => e
     handle_error(e, &blk)
     nil # terminate evoke chain
@@ -805,15 +805,20 @@ class VCAP::Services::Base::Provisioner < VCAP::Services::Base::Base
     raise ServiceError.new(ServiceError::NOT_FOUND, service_id) unless svc
 
     plan = find_service_plan(svc)
-    extensions_enabled?(plan, :job)
+    extensions_enabled?(plan, :job, &blk)
   rescue => e
     handle_error(e, &blk)
     nil # terminate evoke chain
   end
 
-  def extensions_enabled?(plan, extension)
-    raise ServiceError.new(ServiceError::EXTENSION_NOT_IMPL, extension) unless (@extensions[plan.to_sym] && @extensions[plan.to_sym][extension.to_sym])
-    true
+  def extensions_enabled?(plan, extension, &blk)
+    unless (@extensions[plan.to_sym] && @extensions[plan.to_sym][extension.to_sym])
+      @logger.warn("Extension #{extension} is not enabled for plan #{plan}")
+      blk.call(failure(ServiceError.new(ServiceError::EXTENSION_NOT_IMPL, extension)))
+      nil
+    else
+      true
+    end
   end
 
   # Create a create_snapshot job and return the job object.
@@ -850,6 +855,18 @@ class VCAP::Services::Base::Provisioner < VCAP::Services::Base::Base
     snapshot = snapshot_details(service_id, snapshot_id)
     raise ServiceError.new(ServiceError::NOT_FOUND, snapshot_id) unless snapshot
     blk.call(success(filter_keys(snapshot)))
+  rescue => e
+    handle_error(e, &blk)
+  end
+
+  # Update the name of a snapshot
+  def update_snapshot_name(service_id, snapshot_id, name, &blk)
+    @logger.debug("Update name of snapshot=#{snapshot_id} for service_id=#{service_id} to '#{name}'")
+    svc = @prov_svcs[service_id]
+    raise ServiceError.new(ServiceError::NOT_FOUND, service_id) unless svc
+
+    update_name(service_id, snapshot_id, name)
+    blk.call(success())
   rescue => e
     handle_error(e, &blk)
   end
@@ -1073,7 +1090,7 @@ class VCAP::Services::Base::Provisioner < VCAP::Services::Base::Base
   # various lifecycle jobs class
   abstract :create_snapshot_job, :rollback_snapshot_job, :delete_snapshot_job, :create_serialized_url_job, :import_from_url_job
   # register before filter
-  before [:create_snapshot, :get_snapshot, :enumerate_snapshots, :delete_snapshot, :rollback_snapshot],  :before_snapshot_apis
+  before [:create_snapshot, :get_snapshot, :enumerate_snapshots, :delete_snapshot, :rollback_snapshot, :update_snapshot_name],  :before_snapshot_apis
 
   before [:create_serialized_url, :get_serialized_url, :import_from_url], :before_serialization_apis
 
