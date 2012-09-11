@@ -76,7 +76,7 @@ module VCAP::Services::Base::Utils
       end
       threads = (1..instances.size).collect do |i|
         Thread.new(instances[i - 1]) do |t_instance|
-          check_lock.synchronize {next unless check_set.include?(t_instance.name)}
+          next unless check_lock.synchronize {check_set.include?(t_instance.name)}
           begin
             t_instance.run
           rescue => e
@@ -97,6 +97,26 @@ module VCAP::Services::Base::Utils
     end
     check_set.each do |name|
       @logger.error("Timeout to wait for starting provisioned instance #{name}")
+    end
+  end
+
+  def stop_instances(all_instances)
+    @instance_parallel_stop_count = 10 if @instance_parallel_stop_count.nil?
+    start = 0
+    while start < all_instances.size
+      instances = all_instances.slice(start, [@instance_parallel_stop_count, all_instances.size - start].min)
+      start = start + @instance_parallel_stop_count
+      threads = (1..instances.size).collect do |i|
+        Thread.new(instances[i - 1]) do |t_instance|
+          begin
+            t_instance.stop
+            @logger.info("Successfully stop instance #{t_instance.name}")
+          rescue => e
+            @logger.error("Error stopping instance #{t_instance.name}: #{e}")
+          end
+        end
+      end
+      threads.each {|t| t.join}
     end
   end
 
