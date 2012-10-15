@@ -18,7 +18,7 @@ module VCAP::Services::Base::Warden
       warden_client
     end
 
-    attr_reader :base_dir, :log_dir, :image_dir, :max_disk, :logger, :quota
+    attr_reader :base_dir, :log_dir, :image_dir, :max_disk, :logger, :quota, :memory_limit
   end
 
   def logger
@@ -108,6 +108,9 @@ module VCAP::Services::Base::Warden
       end
       FileUtils.rm_rf(base_dir)
       FileUtils.rm_rf(log_dir)
+      util_dirs.each do |util_dir|
+        FileUtils.rm_rf(util_dir)
+      end
     end
     Process.detach(pid) if pid
     # delete recorder
@@ -124,7 +127,13 @@ module VCAP::Services::Base::Warden
     log_bind.src_path = log_dir
     log_bind.dst_path = "/store/log"
     log_bind.mode = Warden::Protocol::CreateRequest::BindMount::Mode::RW
-    self[:container], self[:ip] = container_start(service_script, [data_bind, log_bind])
+    bind_mounts = additional_binds.map do |additional_bind|
+      bind = Warden::Protocol::CreateRequest::BindMount.new
+      additional_bind.each { |k,v| bind.send("#{k}=", v)}
+      bind
+    end
+    bind_mounts << data_bind << log_bind
+    self[:container], self[:ip] = container_start(service_script, bind_mounts)
     save!
     map_port(self[:port], self[:ip], service_port)
     true
@@ -163,6 +172,7 @@ module VCAP::Services::Base::Warden
     end
     rsp = warden.call(req)
     handle = rsp.handle
+    limit_memory(handle, self.class.memory_limit) if self.class.memory_limit
     req = Warden::Protocol::InfoRequest.new
     req.handle = handle
     rsp = warden.call(req)
@@ -174,6 +184,16 @@ module VCAP::Services::Base::Warden
     warden.disconnect
     sleep 1
     [handle, ip]
+  end
+
+  def limit_memory(handle, memory_limit)
+    warden = self.class.warden_connect
+    req = Warden::Protocol::LimitMemoryRequest.new
+    req.handle = handle
+    req.limit_in_bytes = memory_limit * 1024 * 1024
+    warden.call(req)
+    warden.disconnect
+    true
   end
 
   def container_stop(handle, force=true)
@@ -273,5 +293,13 @@ module VCAP::Services::Base::Warden
 
   def log_dir?
     Dir.exists?(log_dir)
+  end
+
+  def additional_binds
+    []
+  end
+
+  def util_dirs
+    []
   end
 end
